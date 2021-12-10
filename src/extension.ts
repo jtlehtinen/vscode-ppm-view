@@ -240,7 +240,7 @@ export function activate(context: vscode.ExtensionContext) {
   // modification operation has been modified. Add artificial
   // delay to hack around it.
   function scheduleProviderRefresh(uri: vscode.Uri): void {
-    setTimeout(() => provider.refresh(uri), 100);
+    setTimeout(() => provider.refresh(uri), 500);
   }
 
   const watcher = vscode.workspace.createFileSystemWatcher('**/*.ppm');
