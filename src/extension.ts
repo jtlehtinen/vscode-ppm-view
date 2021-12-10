@@ -1,26 +1,84 @@
-// The module 'vscode' contains the VS Code extensibility API
-// Import the module and reference it with the alias vscode in your code below
 import * as vscode from 'vscode';
 
-// this method is called when your extension is activated
-// your extension is activated the very first time the command is executed
+function generateHTML() {
+  return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PPM View</title>
+</head>
+<body>
+  <h1>Hello</h1>
+</body>
+</html>
+`;
+}
+
+class PPMDocument implements vscode.CustomDocument {
+  readonly uri: vscode.Uri;
+
+  private constructor(uri: vscode.Uri) {
+    this.uri = uri;
+  }
+
+  dispose(): void { }
+
+  static async create(uri: vscode.Uri): Promise<PPMDocument> {
+    return new PPMDocument(uri);
+  }
+}
+
+// WebviewCollection is borrowed from
+// https://github.com/microsoft/vscode-extension-samples/blob/main/custom-editor-sample/src/pawDrawEditor.ts
+class WebviewCollection {
+  private readonly _webviews = new Set<{ readonly resource: string; readonly webviewPanel: vscode.WebviewPanel; }>();
+
+  /**
+   * Get all known webviews for a given uri.
+   */
+  public *get(uri: vscode.Uri): Iterable<vscode.WebviewPanel> {
+    const key = uri.toString();
+    for (const entry of this._webviews) {
+      if (entry.resource === key) {
+        yield entry.webviewPanel;
+      }
+    }
+  }
+
+  /**
+   * Add a new webview to the collection.
+   */
+  public add(uri: vscode.Uri, webviewPanel: vscode.WebviewPanel) {
+    const entry = { resource: uri.toString(), webviewPanel };
+    this._webviews.add(entry);
+    webviewPanel.onDidDispose(() => this._webviews.delete(entry));
+  }
+}
+
+class PPMProvider implements vscode.CustomReadonlyEditorProvider<PPMDocument> {
+  private readonly webviews = new WebviewCollection();
+
+  constructor(private readonly _context: vscode.ExtensionContext) { }
+
+  async openCustomDocument(uri: vscode.Uri, _openContext: {}, _token: vscode.CancellationToken): Promise<PPMDocument> {
+    return await PPMDocument.create(uri);
+  }
+
+  async resolveCustomEditor(document: PPMDocument, webviewPanel: vscode.WebviewPanel, _token: vscode.CancellationToken) {
+    webviewPanel.webview.options = { enableScripts: true, };
+    webviewPanel.webview.html = generateHTML();
+    this.webviews.add(document.uri, webviewPanel);
+  }
+}
+
 export function activate(context: vscode.ExtensionContext) {
-
-  // Use the console to output diagnostic information (console.log) and errors (console.error)
-  // This line of code will only be executed once when your extension is activated
-  console.log('Congratulations, your extension "vscode-ppm-view" is now active!');
-
-  // The command has been defined in the package.json file
-  // Now provide the implementation of the command with registerCommand
-  // The commandId parameter must match the command field in package.json
-  let disposable = vscode.commands.registerCommand('vscode-ppm-view.helloWorld', () => {
-    // The code you place here will be executed every time your command is executed
-    // Display a message box to the user
-    vscode.window.showInformationMessage('Hello World from vscode-ppm-view!');
-  });
-
+  const provider = new PPMProvider(context);
+  const options = { supportsMultipleEditorsPerDocument: false, };
+  const disposable = vscode.window.registerCustomEditorProvider("vscode-ppm-view.ppm-view", provider, options);
   context.subscriptions.push(disposable);
 }
 
-// this method is called when your extension is deactivated
 export function deactivate() { }
