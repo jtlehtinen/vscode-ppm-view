@@ -1,8 +1,6 @@
 import * as vscode from 'vscode';
 
-function generateHTML(uri: vscode.Uri, pixels: Uint8Array, width: number, height: number) {
-  console.log(uri.toString());
-
+function generateHTML(pixels: Uint8Array, width: number, height: number) {
   return `
 <!DOCTYPE html>
 <html lang="en">
@@ -160,7 +158,7 @@ async function readPPMAndGenerateHTML(uri: vscode.Uri): Promise<string> {
   try {
     const ppm = await readTextFile(uri);
     const image = parsePPM(ppm);
-    return generateHTML(uri, image.pixels, image.width, image.height);
+    return generateHTML(image.pixels, image.width, image.height);
   } catch (err: any) {
     vscode.window.showErrorMessage(err.message);
     return "ERROR: " + err.message;
