@@ -2,7 +2,7 @@
   "name": "vscode-ppm-view",
   "displayName": "vscode-ppm-view",
   "description": "PPM view for vscode",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "private": true,
   "license": "MIT",
   "repository": {
