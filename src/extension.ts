@@ -237,7 +237,7 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(disposable);
 
   // @NOTE: File modified event may be triggered before the file
-  // modification operation has been modified. Add artificial
+  // modification operation has been completed. Add artificial
   // delay to hack around it.
   function scheduleProviderRefresh(uri: vscode.Uri): void {
     setTimeout(() => provider.refresh(uri), 500);
