@@ -236,8 +236,15 @@ export function activate(context: vscode.ExtensionContext) {
   const disposable = vscode.window.registerCustomEditorProvider("vscode-ppm-view.ppm-view", provider, options);
   context.subscriptions.push(disposable);
 
+  // @NOTE: File modified event may be triggered before the file
+  // modification operation has been modified. Add artificial
+  // delay to hack around it.
+  function scheduleProviderRefresh(uri: vscode.Uri): void {
+    setTimeout(() => provider.refresh(uri), 100);
+  }
+
   const watcher = vscode.workspace.createFileSystemWatcher('**/*.ppm');
-  watcher.onDidChange(uri => provider.refresh(uri));
+  watcher.onDidChange(scheduleProviderRefresh);
   context.subscriptions.push(watcher);
 }
 
