@@ -69,7 +69,7 @@ async function readTextFile(uri: vscode.Uri): Promise<string> {
   return document.getText();
 }
 
-function parsePPM(ppm: string): Image {
+export function parsePPM(ppm: string): Image {
   // @TODO: raw ppm
   // @TODO: comments
   // @TODO: tests
@@ -90,7 +90,7 @@ function parsePPM(ppm: string): Image {
   }
 
   function isWhitespace(c: string): boolean {
-    return (c == ' ' || c == '\n' || c == '\r' || c == '\t');
+    return (c === ' ' || c === '\n' || c === '\r' || c === '\t');
   }
 
   function skipWhitespace(parser: Parser): void {
