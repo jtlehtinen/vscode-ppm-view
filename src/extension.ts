@@ -8,7 +8,7 @@ function generateHTML(pixels: Uint8Array, width: number, height: number) {
   <meta charset="UTF-8">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>test</title>
+  <title>PPM View</title>
 
   <style>
     * {
