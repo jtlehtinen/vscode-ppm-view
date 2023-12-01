@@ -1,6 +1,3 @@
-const MIN_SCALE = 0.1
-const MAX_SCALE = 10.0
-
 const canvas = document.getElementById('canvas')
 const context = canvas.getContext('2d')
 
@@ -38,6 +35,9 @@ window.addEventListener('message', async (event) => {
 window.addEventListener('wheel', event => {
   if (!event.ctrlKey)
     return
+
+  const MIN_SCALE = 0.1
+  const MAX_SCALE = 10.0
 
   const normalizedDelta = -event.deltaY / 100.0
   scale = clamp(scale + normalizedDelta * 0.1, MIN_SCALE, MAX_SCALE)
