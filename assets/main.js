@@ -14,6 +14,8 @@ const clamp = (value, min, max) => {
 }
 
 const drawImage = async (bitmap, scale) => {
+  if (!bitmap) return
+
   const scaledWidth = Math.ceil(bitmap.width * scale)
   const scaledHeight = Math.ceil(bitmap.height * scale)
 
@@ -41,4 +43,12 @@ window.addEventListener('wheel', event => {
   scale = clamp(scale + normalizedDelta * 0.1, MIN_SCALE, MAX_SCALE)
 
   drawImage(bitmap, scale)
+})
+
+window.addEventListener('mousedown', (event) => {
+  const MIDDLE = 1
+  if (event.button === MIDDLE) {
+    scale = 1.0
+    drawImage(bitmap, scale)
+  }
 })
