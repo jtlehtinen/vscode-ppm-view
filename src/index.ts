@@ -1,7 +1,7 @@
 import * as vscode from 'vscode'
 import { parsePPM } from './ppm'
 
-function generateHTML(uri: vscode.Uri, pixels: Uint8Array, width: number, height: number) {
+function generateHTML(pixels: Uint8Array, width: number, height: number) {
   return `
 <!DOCTYPE html>
 <html lang="en">
@@ -9,7 +9,7 @@ function generateHTML(uri: vscode.Uri, pixels: Uint8Array, width: number, height
   <meta charset="UTF-8">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PPM</title>
+  <title>ppm view</title>
 
   <style>
     * {
@@ -68,7 +68,7 @@ async function readPPMAndGenerateHTML(uri: vscode.Uri): Promise<string> {
   try {
     const ppm = await readTextFile(uri)
     const image = parsePPM(ppm)
-    return generateHTML(uri, image.pixels, image.width, image.height)
+    return generateHTML(image.pixels, image.width, image.height)
   } catch (err: any) {
     vscode.window.showErrorMessage(err.message)
     return "ERROR: " + err.message
@@ -142,8 +142,16 @@ export function activate(context: vscode.ExtensionContext) {
   const disposable = vscode.window.registerCustomEditorProvider('vscode-ppm-view.ppm-view', provider, options)
   context.subscriptions.push(disposable)
 
+  // @NOTE: File modified event may be triggered before the file
+  // modification operation has finished. Add artificial delay to
+  // hack around it.
+  // @TODO: Find better solution.
+  const scheduleProviderRefresh = (uri: vscode.Uri): void => {
+    setTimeout(() => provider.refresh(uri), 500);
+  }
+
   const watcher = vscode.workspace.createFileSystemWatcher('**/*.ppm')
-  watcher.onDidChange(uri => provider.refresh(uri))
+  watcher.onDidChange(scheduleProviderRefresh)
   context.subscriptions.push(watcher)
 }
 
