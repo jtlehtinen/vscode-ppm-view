@@ -27,7 +27,7 @@ const drawImage = async (bitmap, scale) => {
 window.addEventListener('message', async (event) => {
   const { command, pixels, width, height } = event.data
   if (command === 'image') {
-    var imageData = new ImageData(pixels, width, height)
+    const imageData = new ImageData(pixels, width, height)
     bitmap = await window.createImageBitmap(imageData)
     drawImage(bitmap, scale)
   }

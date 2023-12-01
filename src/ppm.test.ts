@@ -22,7 +22,7 @@ describe('PPM P3 parser', () => {
   it('fails when illegal characters', () => {
     const validPPM = 'P3 2 2 255 0 1 2 3 4 5 0 1 2 3 4 5'
     for (let i = 0; i < validPPM.length; ++i) {
-      const invalidPPM = validPPM.slice(0, i) + 'a' + validPPM.slice(i)
+      const invalidPPM = `${validPPM.slice(0, i)}a${validPPM.slice(i)}`
       expect(() => parsePPM(invalidPPM)).toThrowError()
     }
   })
