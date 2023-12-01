@@ -3,13 +3,12 @@ import { parsePPM } from './ppm'
 import { createWebviewContent } from './webview'
 import type { Image } from './ppm'
 
-async function readTextFile(uri: vscode.Uri): Promise<string> {
-  const document = await vscode.workspace.openTextDocument(uri)
-  return document.getText()
+async function readFile(uri: vscode.Uri): Promise<Uint8Array> {
+  return vscode.workspace.fs.readFile(uri)
 }
 
 async function readPPMFromFile(uri: vscode.Uri): Promise<Image> {
-  const ppm = await readTextFile(uri)
+  const ppm = await readFile(uri)
   return parsePPM(ppm)
 }
 
