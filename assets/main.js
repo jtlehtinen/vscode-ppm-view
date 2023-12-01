@@ -20,6 +20,7 @@ const drawImage = async (bitmap, scale) => {
   canvas.width = scaledWidth
   canvas.height = scaledHeight
 
+  context.imageSmoothingQuality = 'high'
   context.drawImage(bitmap, 0, 0, scaledWidth, scaledHeight)
 }
 
