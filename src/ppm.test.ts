@@ -60,6 +60,71 @@ describe('PPM P3 parser', () => {
   })
 })
 
+describe('PBM P1 parser', () => {
+  const encoder = new TextEncoder()
+
+  it('succeeds when valid data', () => {
+    const buffer = new Uint8Array([
+      ...encoder.encode('P1 2 3 0 0 1 1 0 0'),
+    ])
+    const result = parsePPM(buffer)
+
+    expect(result.width).toBe(2)
+    expect(result.height).toBe(3)
+    expect(result.pixels).toStrictEqual(
+      new Uint8ClampedArray([
+        0, 0, 0, 255,
+        0, 0, 0, 255,
+        255, 255, 255, 255,
+        255, 255, 255, 255,
+        0, 0, 0, 255,
+        0, 0, 0, 255,
+      ]),
+    )
+  })
+
+  // @TODO: Test with comments
+})
+
+describe('PBM P4 parser', () => {
+  const encoder = new TextEncoder()
+
+  it('succeeds when valid data', () => {
+    const buffer = new Uint8Array([
+      ...encoder.encode('P4 5 3 '),
+      ...[0xf8, 0, 0xf8], // 11111000 00000000 11111000
+    ])
+    const result = parsePPM(buffer)
+
+    expect(result.width).toBe(5)
+    expect(result.height).toBe(3)
+    expect(result.pixels).toStrictEqual(
+      new Uint8ClampedArray([
+        255, 255, 255, 255,
+        255, 255, 255, 255,
+        255, 255, 255, 255,
+        255, 255, 255, 255,
+        255, 255, 255, 255,
+
+        0, 0, 0, 255,
+        0, 0, 0, 255,
+        0, 0, 0, 255,
+        0, 0, 0, 255,
+        0, 0, 0, 255,
+
+        255, 255, 255, 255,
+        255, 255, 255, 255,
+        255, 255, 255, 255,
+        255, 255, 255, 255,
+        255, 255, 255, 255,
+      ]),
+    )
+  })
+
+  // @TODO: Test with comments
+})
+
+
 describe('PPM P6 parser', () => {
   const encoder = new TextEncoder()
 
