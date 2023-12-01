@@ -1,7 +1,7 @@
 {
   "name": "vscode-ppm-view",
-  "displayName": "vscode-ppm-view",
-  "description": "PPM view for vscode",
+  "displayName": "PPM View",
+  "description": "PPM view for VSCode supporting PPM P3 and P6 formats",
   "version": "0.0.1",
   "private": true,
   "packageManager": "pnpm@8.8.0",
