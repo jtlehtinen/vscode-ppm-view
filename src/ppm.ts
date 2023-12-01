@@ -1,13 +1,17 @@
 interface Image {
-  pixels: Uint8Array
+  pixels: Uint8ClampedArray
   width: number
   height: number
 }
 
+// [ppm](https://netpbm.sourceforge.net/doc/ppm.html)
+// [ppm/pgm/pbm image files](http://paulbourke.net/dataformats/ppm/)
 function parsePPM(ppm: string): Image {
   // @TODO: raw ppm
   // @TODO: comments
   // @TODO: tests
+  // @TODO: P3
+  // @TODO: P6
   interface Parser { ppm: string, idx: number }
 
   const parser: Parser = { ppm: ppm, idx: 0 }
@@ -57,7 +61,7 @@ function parsePPM(ppm: string): Image {
 
   const componentsPerPixel = 4
 
-  const pixels = new Uint8Array(width * height * componentsPerPixel)
+  const pixels = new Uint8ClampedArray(width * height * componentsPerPixel)
 
   for (let i = 0; i < width * height; ++i) {
     const r = expectNumber(parser)

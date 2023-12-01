@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { parsePPM } from './ppm'
 
-describe('ppm parser', () => {
+describe('PPM P3 parser', () => {
   it('succeeds when valid data', () => {
     const result = parsePPM('P3 2 2 255 0 1 2 3 4 5 0 1 2 3 4 5')
     expect(result.width).toBe(2)
@@ -26,4 +26,8 @@ describe('ppm parser', () => {
       expect(() => parsePPM(invalidPPM)).toThrowError()
     }
   })
+})
+
+describe('PPM P6 parser', () => {
+
 })

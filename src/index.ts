@@ -1,77 +1,20 @@
 import * as vscode from 'vscode'
 import { parsePPM } from './ppm'
-
-function generateHTML(pixels: Uint8Array, width: number, height: number) {
-  return `
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta http-equiv="X-UA-Compatible" content="IE=edge">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ppm view</title>
-
-  <style>
-    * {
-      box-sizing: border-box;
-    }
-
-    html {
-      height: 100%;
-    }
-
-    body {
-      margin: 0;
-      padding: 0;
-      width: 100%;
-      height: 100%;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-    }
-  </style>
-</head>
-<body>
-  <canvas id="canvas"></canvas>
-
-  <script>
-    const width = ${width}
-    const height = ${height}
-
-    const canvas = document.getElementById('canvas')
-    canvas.width = width
-    canvas.height = height
-
-    // https://developer.mozilla.org/en-US/docs/Web/API/Canvas_API/Tutorial/Pixel_manipulation_with_canvas
-    const context = canvas.getContext('2d')
-    const imageData = context.createImageData(width, height)
-
-    // @TODO: This is just awful... How to embed binary data?
-    // @TODO: Way to read from the file system?
-    const pixels = [${pixels.join(',')}]
-    const data = imageData.data
-    pixels.forEach((px, idx) => data[idx] = px)
-
-    context.putImageData(imageData, 0, 0)
-  </script>
-</body>
-</html>
-`
-}
+import { createWebviewContent } from './webview'
+import type { Image } from './ppm'
 
 async function readTextFile(uri: vscode.Uri): Promise<string> {
   const document = await vscode.workspace.openTextDocument(uri)
   return document.getText()
 }
 
-async function readPPMAndGenerateHTML(uri: vscode.Uri): Promise<string> {
+async function readPPMFromFile(uri: vscode.Uri): Promise<Image> {
   try {
     const ppm = await readTextFile(uri)
-    const image = parsePPM(ppm)
-    return generateHTML(image.pixels, image.width, image.height)
+    return parsePPM(ppm)
   } catch (err: any) {
     vscode.window.showErrorMessage(err.message)
-    return "ERROR: " + err.message
+    throw Error(err.message) // @TODO: ...
   }
 }
 
@@ -82,7 +25,7 @@ class PPMDocument implements vscode.CustomDocument {
     this.uri = uri
   }
 
-  dispose(): void { }
+  dispose(): void {}
 
   static async create(uri: vscode.Uri): Promise<PPMDocument> {
     return new PPMDocument(uri)
@@ -115,44 +58,73 @@ class WebviewCollection {
 class PPMProvider implements vscode.CustomReadonlyEditorProvider<PPMDocument> {
   private readonly webviews = new WebviewCollection()
 
-  constructor(private readonly _context: vscode.ExtensionContext) { }
+  constructor(private readonly _context: vscode.ExtensionContext) {}
 
   async openCustomDocument(uri: vscode.Uri, _openContext: {}, _token: vscode.CancellationToken): Promise<PPMDocument> {
     return await PPMDocument.create(uri)
   }
 
   async resolveCustomEditor(document: PPMDocument, webviewPanel: vscode.WebviewPanel, _token: vscode.CancellationToken): Promise<void> {
-    webviewPanel.webview.options = { enableScripts: true }
-    webviewPanel.webview.html = await readPPMAndGenerateHTML(document.uri)
+
+    const options = {
+      enableScripts: true,
+      localResourceRoots: [vscode.Uri.joinPath(this._context.extensionUri, 'assets')],
+    }
+
+    const uris = {
+      script: webviewPanel.webview.asWebviewUri(vscode.Uri.joinPath(this._context.extensionUri, 'assets', 'main.js')),
+    }
+
+    webviewPanel.webview.options = options
+    webviewPanel.webview.html = createWebviewContent(document.uri.toString(), uris)
     this.webviews.add(document.uri, webviewPanel)
+
+    this.reload(document.uri)
   }
 
-  async refresh(uri: vscode.Uri): Promise<void> {
+  async reload(uri: vscode.Uri): Promise<void> {
     const views = Array.from(this.webviews.get(uri))
     if (views.length === 0) return
 
-    const html = await readPPMAndGenerateHTML(uri)
-    views.forEach(view => view.webview.html = html)
+    const image = await readPPMFromFile(uri)
+
+    views.forEach(view => {
+      view.webview.postMessage(
+        {
+          command: 'image',
+          width: image.width,
+          height: image.height,
+          pixels: image.pixels,
+        }
+      )
+    })
   }
 }
 
-export function activate(context: vscode.ExtensionContext) {
+function activate(context: vscode.ExtensionContext) {
   const provider = new PPMProvider(context)
-  const options = { supportsMultipleEditorsPerDocument: false }
-  const disposable = vscode.window.registerCustomEditorProvider('vscode-ppm-view.ppm-view', provider, options)
+  const options = {
+    supportsMultipleEditorsPerDocument: false,
+    webviewOptions: {
+      retainContextWhenHidden: true,
+    }
+  }
+  const disposable = vscode.window.registerCustomEditorProvider(
+    'vscode-ppm-view.ppm',
+    provider,
+    options,
+  )
   context.subscriptions.push(disposable)
 
-  // @NOTE: File modified event may be triggered before the file
-  // modification operation has finished. Add artificial delay to
-  // hack around it.
-  // @TODO: Find better solution.
-  const scheduleProviderRefresh = (uri: vscode.Uri): void => {
-    setTimeout(() => provider.refresh(uri), 500);
-  }
-
   const watcher = vscode.workspace.createFileSystemWatcher('**/*.ppm')
-  watcher.onDidChange(scheduleProviderRefresh)
+  watcher.onDidChange((uri: vscode.Uri): void => {
+    // @NOTE: File modified event may be triggered before the file
+    // modification operation has finished. Add artificial delay to
+    // hack around it.
+    // @TODO: Find better solution.
+    setTimeout(() => provider.reload(uri), 500)
+  })
   context.subscriptions.push(watcher)
 }
 
-export function deactivate() { }
+export { activate }

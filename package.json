@@ -20,7 +20,7 @@
   "contributes": {
     "customEditors": [
       {
-        "viewType": "vscode-ppm-view.ppm-view",
+        "viewType": "vscode-ppm-view.ppm",
         "displayName": "PPM View",
         "selector": [
           {
