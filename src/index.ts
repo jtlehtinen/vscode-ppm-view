@@ -1,4 +1,5 @@
 import * as vscode from 'vscode'
+import { parsePPM } from './ppm'
 
 function generateHTML(uri: vscode.Uri, pixels: Uint8Array, width: number, height: number) {
   return `
@@ -58,102 +59,9 @@ function generateHTML(uri: vscode.Uri, pixels: Uint8Array, width: number, height
 `
 }
 
-interface Image {
-  pixels: Uint8Array
-  width: number
-  height: number
-}
-
 async function readTextFile(uri: vscode.Uri): Promise<string> {
   const document = await vscode.workspace.openTextDocument(uri)
   return document.getText()
-}
-
-function parsePPM(ppm: string): Image {
-  // @TODO: raw ppm
-  // @TODO: comments
-  // @TODO: tests
-  interface Parser { ppm: string, idx: number }
-
-  const parser: Parser = { ppm: ppm, idx: 0 }
-
-  function peek(parser: Parser): string {
-    return parser.ppm.charAt(parser.idx)
-  }
-
-  function next(parser: Parser): string {
-    return parser.ppm.charAt(parser.idx++)
-  }
-
-  function isAtEnd(parser: Parser): boolean {
-    return (parser.idx >= parser.ppm.length)
-  }
-
-  function isWhitespace(c: string): boolean {
-    return (c == ' ' || c == '\n' || c == '\r' || c == '\t')
-  }
-
-  function skipWhitespace(parser: Parser): void {
-    while (!isAtEnd(parser) && isWhitespace(peek(parser))) {
-      next(parser)
-    }
-  }
-
-  function isDigit(c: string): boolean {
-    return c >= '0' && c <= '9'
-  }
-
-  function accept(parser: Parser, prefix: string): boolean {
-    const result = (parser.ppm.startsWith(prefix, parser.idx))
-    if (result) parser.idx += prefix.length
-
-    return result
-  }
-
-  function expectNumber(parser: Parser): number {
-    const begin = parser.idx
-
-    let result = 0
-    while (!isAtEnd(parser) && isDigit(peek(parser))) {
-      result = result * 10 + Number(next(parser))
-    }
-    if (begin === parser.idx) throw new Error("invalid ppm file")
-
-    return result
-  }
-
-  skipWhitespace(parser)
-
-  if (!accept(parser, "P3")) throw new Error("invalid ppm file")
-
-  skipWhitespace(parser)
-  const width = expectNumber(parser)
-  skipWhitespace(parser)
-  const height = expectNumber(parser)
-  skipWhitespace(parser)
-  const maxColorValue = expectNumber(parser)
-  skipWhitespace(parser)
-
-  const componentsPerPixel = 4
-
-  const pixels = new Uint8Array(width * height * componentsPerPixel)
-
-  for (let i = 0; i < width * height; ++i) {
-    const r = expectNumber(parser)
-    skipWhitespace(parser)
-    const g = expectNumber(parser)
-    skipWhitespace(parser)
-    const b = expectNumber(parser)
-    skipWhitespace(parser)
-
-    // @TODO: apply conversion from [0, maxColorValue] to [0, 255]
-    pixels[i * componentsPerPixel + 0] = r
-    pixels[i * componentsPerPixel + 1] = g
-    pixels[i * componentsPerPixel + 2] = b
-    pixels[i * componentsPerPixel + 3] = 255
-  }
-
-  return { pixels, width, height }
 }
 
 async function readPPMAndGenerateHTML(uri: vscode.Uri): Promise<string> {
