@@ -89,6 +89,7 @@ class PPMProvider implements vscode.CustomReadonlyEditorProvider<PPMDocument> {
           width: image.width,
           height: image.height,
           pixels: image.pixels,
+          format: image.format,
         })
       })
     } catch (err) {

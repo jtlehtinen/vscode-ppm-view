@@ -1,6 +1,9 @@
 import * as vscode from 'vscode'
 
 const createWebviewContent = (title: string, uris: { script: vscode.Uri }) => {
+  const config = vscode.workspace.getConfiguration('editor')
+  const fontFamily = config.get('fontFamily') ?? `Consolas, 'Courier New', monospace`
+
   const nonce = getNonce()
 
   return `
@@ -28,18 +31,25 @@ const createWebviewContent = (title: string, uris: { script: vscode.Uri }) => {
         justify-content: center;
         align-items: center;
         flex-direction: column;
-        font-family: consolas;
+        font-family: ${fontFamily};
+        background-color: var(--vscode-editor-background);
       }
 
-      p {
+      .error {
         font-size: 2rem;
         font-weight: bold;
         color: red;
       }
+
+      p {
+        color: var(--vscode-editor-foreground);
+        font-size: 1rem;
+      }
     </style>
   </head>
   <body>
-    <p id="error"></p>
+    <p id="info" style="text-align: center;">PPM 6 256x256 100%</p>
+    <p id="error" class="error"></p>
     <canvas id="canvas"></canvas>
     <script nonce="${nonce}" src="${uris.script}"></script>
   </body>

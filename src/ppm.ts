@@ -22,6 +22,7 @@ interface Image {
   pixels: Uint8ClampedArray
   width: number
   height: number
+  format: string
 }
 
 interface Parser {
@@ -137,7 +138,7 @@ function parseP3(buffer: Uint8Array): Image {
     pixels[i * componentsPerPixel + 3] = 255
   }
 
-  return { pixels, width, height }
+  return { pixels, width, height, format: 'PPM P3' }
 }
 
 function parseP6(buffer: Uint8Array): Image {
@@ -175,7 +176,7 @@ function parseP6(buffer: Uint8Array): Image {
     pixels[i * componentsPerPixel + 3] = 255
   }
 
-  return { pixels, width, height }
+  return { pixels, width, height, format: 'PPM P3' }
 }
 
 function parsePPM(buffer: Uint8Array): Image {
