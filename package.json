@@ -33,7 +33,7 @@
   },
   "scripts": {
     "build": "tsup src/index.ts --external vscode",
-    "dev": "npm run build -- --watch",
+    "dev": "npm run build -- --watch --sourcemap",
     "vscode:prepublish": "npm run build",
     "publish": "vsce publish --no-dependencies",
     "pack": "vsce package --no-dependencies",

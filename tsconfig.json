@@ -1,6 +1,7 @@
 {
   "compilerOptions": {
-    "target": "es2017",
+    "target": "es2022",
+    "outDir": "dist",
     "module": "esnext",
     "lib": ["esnext"],
     "moduleResolution": "node",
@@ -9,6 +10,11 @@
     "strictNullChecks": true,
     "resolveJsonModule": true,
     "skipLibCheck": true,
-    "skipDefaultLibCheck": true
-  }
+    "skipDefaultLibCheck": true,
+    "sourceMap": true,
+    "rootDir": "src"
+  },
+  "exclude": [
+    "./tsup.config.ts",
+  ]
 }
