@@ -20,8 +20,7 @@ const drawImage = async (bitmap, scale) => {
   canvas.width = scaledWidth
   canvas.height = scaledHeight
 
-  context.scale(scale, scale)
-  context.drawImage(bitmap, 0, 0)
+  context.drawImage(bitmap, 0, 0, scaledWidth, scaledHeight)
 }
 
 window.addEventListener('message', async (event) => {
