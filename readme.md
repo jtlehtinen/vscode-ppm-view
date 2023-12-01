@@ -1,6 +1,6 @@
 # vscode-ppm-view
 
-Simple [PPM](https://netpbm.sourceforge.net/doc/ppm.html) viewer extension for Visual Studio Code.
+Simple [PPM](https://netpbm.sourceforge.net/doc/ppm.html), [PBM](https://netpbm.sourceforge.net/doc/pbm.html) viewer extension for Visual Studio Code.
 
 ## Interaction Guide
 
