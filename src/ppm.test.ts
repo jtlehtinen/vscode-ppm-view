@@ -7,7 +7,7 @@ describe('PPM P3 parser', () => {
     expect(result.width).toBe(2)
     expect(result.height).toBe(2)
     expect(result.pixels).toStrictEqual(
-      new Uint8Array([0, 1, 2, 255, 3, 4, 5, 255, 0, 1, 2, 255, 3, 4, 5, 255])
+      new Uint8ClampedArray([0, 1, 2, 255, 3, 4, 5, 255, 0, 1, 2, 255, 3, 4, 5, 255])
     )
   })
 
@@ -29,5 +29,5 @@ describe('PPM P3 parser', () => {
 })
 
 describe('PPM P6 parser', () => {
-
+  it('dummy', () => { })
 })
