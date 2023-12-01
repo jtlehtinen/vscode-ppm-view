@@ -32,11 +32,14 @@ const createWebviewContent = (title: string, uris: { script: vscode.Uri }) => {
       }
 
       p {
+        font-size: 2rem;
         font-weight: bold;
+        color: red;
       }
     </style>
   </head>
   <body>
+    <p id="error"></p>
     <canvas id="canvas"></canvas>
     <script nonce="${nonce}" src="${uris.script}"></script>
   </body>

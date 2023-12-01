@@ -1,3 +1,4 @@
+const error = document.getElementById('error')
 const canvas = document.getElementById('canvas')
 const context = canvas.getContext('2d')
 
@@ -16,6 +17,7 @@ const drawImage = async (bitmap, scale) => {
   const scaledWidth = Math.ceil(bitmap.width * scale)
   const scaledHeight = Math.ceil(bitmap.height * scale)
 
+  canvas.style.display = 'block'
   canvas.width = scaledWidth
   canvas.height = scaledHeight
 
@@ -23,12 +25,31 @@ const drawImage = async (bitmap, scale) => {
   context.drawImage(bitmap, 0, 0, scaledWidth, scaledHeight)
 }
 
+const hideImage = () => {
+  bitmap = null
+  canvas.style.display = 'none'
+}
+
+const hideError = () => {
+  error.style.display = 'none'
+}
+
+const showError = (errorMessage) => {
+  error.style.display = 'block'
+  error.textContent = `✖ ${errorMessage}`
+}
+
 window.addEventListener('message', async (event) => {
   const { command, pixels, width, height } = event.data
   if (command === 'image') {
     const imageData = new ImageData(pixels, width, height)
     bitmap = await window.createImageBitmap(imageData)
+
+    hideError()
     drawImage(bitmap, scale)
+  } else if (command === 'error') {
+    hideImage()
+    showError(event.data.message)
   }
 })
 

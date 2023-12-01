@@ -9,13 +9,8 @@ async function readTextFile(uri: vscode.Uri): Promise<string> {
 }
 
 async function readPPMFromFile(uri: vscode.Uri): Promise<Image> {
-  try {
-    const ppm = await readTextFile(uri)
-    return parsePPM(ppm)
-  } catch (err: any) {
-    vscode.window.showErrorMessage(err.message)
-    throw Error(err.message) // @TODO: ...
-  }
+  const ppm = await readTextFile(uri)
+  return parsePPM(ppm)
 }
 
 class PPMDocument implements vscode.CustomDocument {
@@ -86,18 +81,27 @@ class PPMProvider implements vscode.CustomReadonlyEditorProvider<PPMDocument> {
     const views = Array.from(this.webviews.get(uri))
     if (views.length === 0) return
 
-    const image = await readPPMFromFile(uri)
+    try {
+      const image = await readPPMFromFile(uri)
 
-    views.forEach(view => {
-      view.webview.postMessage(
-        {
+      views.forEach((view) => {
+        view.webview.postMessage({
           command: 'image',
           width: image.width,
           height: image.height,
           pixels: image.pixels,
-        }
-      )
-    })
+        })
+      })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unexpected error'
+
+      views.forEach((view) => {
+        view.webview.postMessage({
+          command: 'error',
+          message: message,
+        })
+      })
+    }
   }
 }
 
