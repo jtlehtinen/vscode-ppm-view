@@ -3,6 +3,7 @@ import { TextEncoder } from 'util'
 import { parsePPM } from './ppm'
 
 // @TODO: More comprehensive tests...
+// @TODO: Better error messages...
 
 describe('PPM P3 parser', () => {
   const encoder = new TextEncoder()
@@ -18,8 +19,26 @@ describe('PPM P3 parser', () => {
     )
   })
 
-  it('succeeds when valid data includes comments', () => {
+  it('succeeds when includes comments', () => {
+    const testCases = [
+      'P3 # comment\n2 2 255 0 1 2 3 4 5 0 1 2 3 4 5',
+      'P3 2 # comment\n2 255 0 1 2 3 4 5 0 1 2 3 4 5',
+      'P3 2 2 # comment\n255 0 1 2 3 4 5 0 1 2 3 4 5',
+      'P3 2 2 255 # comment\n0 1 2 3 4 5 0 1 2 3 4 5',
+      'P3 2 2 255 0 # comment\n1 2 3 4 5 0 1 2 3 4 5',
+      'P3 2 2 255 0 1 2 3 4 5 0 1 2 3 4 # comment\n5',
+    ]
 
+    for (const tc of testCases) {
+      const buffer = encoder.encode(tc)
+      const result = parsePPM(buffer)
+
+      expect(result.width).toBe(2)
+      expect(result.height).toBe(2)
+      expect(result.pixels).toStrictEqual(
+        new Uint8ClampedArray([0, 1, 2, 255, 3, 4, 5, 255, 0, 1, 2, 255, 3, 4, 5, 255]),
+      )
+    }
   })
 
   it('fails when not enough data', () => {
@@ -56,5 +75,40 @@ describe('PPM P6 parser', () => {
     expect(result.pixels).toStrictEqual(
       new Uint8ClampedArray([0, 1, 2, 255, 3, 4, 5, 255, 0, 1, 2, 255, 3, 4, 5, 255]),
     )
+  })
+
+  it('succeeds when includes comments', () => {
+    const testCases = [
+      new Uint8Array([
+        ...encoder.encode('P6 # comment\n2 2 255 '),
+        ...[0, 1, 2, 3, 4, 5, 0, 1, 2, 3, 4, 5],
+      ]),
+      new Uint8Array([
+        ...encoder.encode('P6 2 # comment\n2 255 '),
+        ...[0, 1, 2, 3, 4, 5, 0, 1, 2, 3, 4, 5],
+      ]),
+      new Uint8Array([
+        ...encoder.encode('P6 2 2 # comment\n255 '),
+        ...[0, 1, 2, 3, 4, 5, 0, 1, 2, 3, 4, 5],
+      ]),
+    ]
+
+    for (const tc of testCases) {
+      const result = parsePPM(tc);
+
+      expect(result.width).toBe(2);
+      expect(result.height).toBe(2);
+      expect(result.pixels).toStrictEqual(
+        new Uint8ClampedArray([0, 1, 2, 255, 3, 4, 5, 255, 0, 1, 2, 255, 3, 4, 5, 255]),
+      )
+    }
+  })
+
+  it('fails when includes misplaced comments', () => {
+    const buffer = new Uint8Array([
+      ...encoder.encode('P6 2 2 255# comment\n '),
+      ...[0, 1, 2, 3, 4, 5, 0, 1, 2, 3, 4, 5],
+    ])
+    expect(() => parsePPM(buffer)).toThrowError()
   })
 })
