@@ -35,7 +35,7 @@ interface Parser {
   idx: number
 }
 
-// @TODO: The image is top-down...
+const clamp = (x: number, min: number, max: number): number => Math.min(Math.max(x, min), max)
 
 const peek = (parser: Parser): number => parser.buffer[parser.idx]
 const next = (parser: Parser): number => parser.buffer[parser.idx++]
@@ -49,8 +49,8 @@ const isWhitespace = (c: number): boolean =>
   c === CHAR_FORM_FEED ||
   c === CHAR_VERTICAL_TAB
 
-// returns true if skipped something false otherwise.
-function skipWhile(parser: Parser, predicate: (c: number) => boolean): boolean {
+// returns true if skipped something; false otherwise.
+const skipWhile = (parser: Parser, predicate: (c: number) => boolean): boolean => {
   const before = parser.idx
   while (!isAtEnd(parser) && predicate(peek(parser))) {
     next(parser)
@@ -58,8 +58,8 @@ function skipWhile(parser: Parser, predicate: (c: number) => boolean): boolean {
   return parser.idx !== before
 }
 
-// returns true if skipped something false otherwise.
-function skipComment(parser: Parser): boolean {
+// returns true if skipped something; false otherwise.
+const skipComment = (parser: Parser): boolean => {
   const before = parser.idx
   if (peek(parser) === CHAR_HASH) {
     skipWhile(parser, (c) => c !== CHAR_NEWLINE)
@@ -67,7 +67,7 @@ function skipComment(parser: Parser): boolean {
   return parser.idx !== before
 }
 
-function skipWhitespaceAndComments(parser: Parser): void {
+const skipWhitespaceAndComments = (parser: Parser): void => {
   for (;;) {
     if (!skipWhile(parser, isWhitespace) && !skipComment(parser)) {
       break
@@ -75,20 +75,20 @@ function skipWhitespaceAndComments(parser: Parser): void {
   }
 }
 
-function expectOne(parser: Parser, predicate: (c: number) => boolean): void {
+const expectOne = (parser: Parser, predicate: (c: number) => boolean): void => {
   if (isAtEnd(parser) || !predicate(peek(parser))) {
     throw new Error(ERROR_INVALID_PPM)
   }
   next(parser)
 }
 
-function expect(parser: Parser, c: number): void {
+const expect = (parser: Parser, c: number): void => {
   if (isAtEnd(parser) || next(parser) !== c) {
     throw new Error('invalid ppm file')
   }
 }
 
-function expectNumber(parser: Parser): number {
+const expectNumber = (parser: Parser): number => {
   const begin = parser.idx
 
   let result = 0
@@ -103,13 +103,63 @@ function expectNumber(parser: Parser): number {
   return result
 }
 
-function validateMaxColorValue(maxColorValue: number): void {
-  if (maxColorValue < 0 || maxColorValue >= 65536) {
-    throw new Error(ERROR_MAX_COLOR_VALUE_OUT_OF_RANGE)
+const parseP1 = (buffer: Uint8Array): Image => {
+  const parser: Parser = { buffer: buffer, idx: 0 }
+  expect(parser, CHAR_P)
+  expect(parser, CHAR_1)
+
+  skipWhitespaceAndComments(parser)
+  const width = expectNumber(parser)
+  skipWhitespaceAndComments(parser)
+  const height = expectNumber(parser)
+  skipWhitespaceAndComments(parser) // @NOTE: strict => single whitespace
+
+  const componentsPerPixel = 4
+  const pixels = new Uint8ClampedArray(width * height * componentsPerPixel)
+
+  for (let i = 0; i < width * height; ++i) {
+    const color = clamp(255 * expectNumber(parser), 0, 255)
+    skipWhitespaceAndComments(parser)
+    pixels[i * componentsPerPixel + 0] = color
+    pixels[i * componentsPerPixel + 1] = color
+    pixels[i * componentsPerPixel + 2] = color
+    pixels[i * componentsPerPixel + 3] = 255
   }
+  return { pixels, width, height, format: 'PBM P1' }
 }
 
-function parseP3(buffer: Uint8Array): Image {
+const parseP2 = (buffer: Uint8Array): Image => {
+  const parser: Parser = { buffer: buffer, idx: 0 }
+  expect(parser, CHAR_P)
+  expect(parser, CHAR_2)
+
+  skipWhitespaceAndComments(parser)
+  const width = expectNumber(parser)
+  skipWhitespaceAndComments(parser)
+  const height = expectNumber(parser)
+  skipWhitespaceAndComments(parser)
+  const maxGrayValue = expectNumber(parser)
+  expectOne(parser, isWhitespace)
+
+  if (maxGrayValue <= 0 || maxGrayValue >= 65536) {
+    throw new Error(ERROR_MAX_COLOR_VALUE_OUT_OF_RANGE)
+  }
+
+  const componentsPerPixel = 4
+  const pixels = new Uint8ClampedArray(width * height * componentsPerPixel)
+
+  for (let i = 0; i < width * height; ++i) {
+    const color = clamp(Math.floor((expectNumber(parser) / maxGrayValue) * 255), 0, 255)
+    skipWhitespaceAndComments(parser)
+    pixels[i * componentsPerPixel + 0] = color
+    pixels[i * componentsPerPixel + 1] = color
+    pixels[i * componentsPerPixel + 2] = color
+    pixels[i * componentsPerPixel + 3] = 255
+  }
+  return { pixels, width, height, format: 'PGM P2' }
+}
+
+const parseP3 = (buffer: Uint8Array): Image => {
   const parser: Parser = { buffer: buffer, idx: 0 }
   expect(parser, CHAR_P)
   expect(parser, CHAR_3)
@@ -120,14 +170,17 @@ function parseP3(buffer: Uint8Array): Image {
   const height = expectNumber(parser)
   skipWhitespaceAndComments(parser)
   const maxColorValue = expectNumber(parser)
-  validateMaxColorValue(maxColorValue)
   skipWhitespaceAndComments(parser)
+
+  if (maxColorValue < 0 || maxColorValue >= 65536) {
+    throw new Error(ERROR_MAX_COLOR_VALUE_OUT_OF_RANGE)
+  }
 
   const componentsPerPixel = 4
   const pixels = new Uint8ClampedArray(width * height * componentsPerPixel)
 
-  // mapColor maps the color component from [0, maxColorValue] to [0, 255].
-  const mapColor = (colorComponent: number) => (colorComponent / maxColorValue) * 255
+  const mapColor = (c: number) =>
+    clamp(Math.floor((c / maxColorValue) * 255), 0, 255)
 
   for (let i = 0; i < width * height; ++i) {
     const r = mapColor(expectNumber(parser))
@@ -142,11 +195,86 @@ function parseP3(buffer: Uint8Array): Image {
     pixels[i * componentsPerPixel + 2] = b
     pixels[i * componentsPerPixel + 3] = 255
   }
-
   return { pixels, width, height, format: 'PPM P3' }
 }
 
-function parseP6(buffer: Uint8Array): Image {
+const parseP4 = (buffer: Uint8Array): Image => {
+  const parser: Parser = { buffer: buffer, idx: 0 }
+  expect(parser, CHAR_P)
+  expect(parser, CHAR_4)
+
+  skipWhitespaceAndComments(parser)
+  const width = expectNumber(parser)
+  skipWhitespaceAndComments(parser)
+  const height = expectNumber(parser)
+  expectOne(parser, isWhitespace)
+
+  const componentsPerPixel = 4
+  const pixels = new Uint8ClampedArray(width * height * componentsPerPixel)
+
+  const mapColor = (colorComponent: number) =>
+    clamp(colorComponent * 255, 0, 255)
+
+  const row =  new Uint8ClampedArray(Math.ceil(width / 8))
+  for (let y = 0; y < height; ++y) {
+    for (let i = 0; i < row.length; ++i) {
+      row[i] = next(parser)
+    }
+
+    for (let x = 0; x < width; ++x) {
+      const byteIndex = Math.floor(x / 8)
+      const bitIndex = x % 8
+      const bit = (row[byteIndex] >> (7 - bitIndex)) & 1
+      const color = mapColor(bit)
+
+      pixels[y * width * componentsPerPixel + x * componentsPerPixel + 0] = color
+      pixels[y * width * componentsPerPixel + x * componentsPerPixel + 1] = color
+      pixels[y * width * componentsPerPixel + x * componentsPerPixel + 2] = color
+      pixels[y * width * componentsPerPixel + x * componentsPerPixel + 3] = 255
+    }
+  }
+  return { pixels, width, height, format: 'PBM P4' }
+}
+
+const parseP5 = (buffer: Uint8Array): Image => {
+  const parser: Parser = { buffer: buffer, idx: 0 }
+  expect(parser, CHAR_P)
+  expect(parser, CHAR_5)
+
+  skipWhitespaceAndComments(parser)
+  const width = expectNumber(parser)
+  skipWhitespaceAndComments(parser)
+  const height = expectNumber(parser)
+  skipWhitespaceAndComments(parser)
+  const maxGrayValue = expectNumber(parser)
+  expectOne(parser, isWhitespace)
+
+  if (maxGrayValue <= 0 || maxGrayValue >= 65536) {
+    throw new Error(ERROR_MAX_COLOR_VALUE_OUT_OF_RANGE)
+  }
+
+  const componentsPerPixel = 4
+  const pixels = new Uint8ClampedArray(width * height * componentsPerPixel)
+
+  const mapColor = (colorComponent: number) =>
+    clamp(Math.floor((colorComponent / maxGrayValue) * 255), 0, 255)
+
+  const nextColorComponent =
+    (maxGrayValue < 256)
+    ? (parser: Parser): number => mapColor(next(parser))
+    : (parser: Parser): number => mapColor((next(parser) << 8) | next(parser))
+
+  for (let i = 0; i < width * height; ++i) {
+    const color = nextColorComponent(parser)
+    pixels[i * componentsPerPixel + 0] = color
+    pixels[i * componentsPerPixel + 1] = color
+    pixels[i * componentsPerPixel + 2] = color
+    pixels[i * componentsPerPixel + 3] = 255
+  }
+  return { pixels, width, height, format: 'PGM P5' }
+}
+
+const parseP6 = (buffer: Uint8Array): Image => {
   const parser: Parser = { buffer: buffer, idx: 0 }
   expect(parser, CHAR_P)
   expect(parser, CHAR_6)
@@ -156,12 +284,12 @@ function parseP6(buffer: Uint8Array): Image {
   skipWhitespaceAndComments(parser)
   const height = expectNumber(parser)
   skipWhitespaceAndComments(parser)
-
-  // @IMPORTANT: Comments must occur before the last header field.
   const maxColorValue = expectNumber(parser)
-  validateMaxColorValue(maxColorValue)
-
   expectOne(parser, isWhitespace)
+
+  if (maxColorValue < 0 || maxColorValue >= 65536) {
+    throw new Error(ERROR_MAX_COLOR_VALUE_OUT_OF_RANGE)
+  }
 
   const componentsPerPixel = 4
   const pixels = new Uint8ClampedArray(width * height * componentsPerPixel)
@@ -184,152 +312,7 @@ function parseP6(buffer: Uint8Array): Image {
   return { pixels, width, height, format: 'PPM P3' }
 }
 
-function parseP1(buffer: Uint8Array): Image {
-  const parser: Parser = { buffer: buffer, idx: 0 }
-  expect(parser, CHAR_P)
-  expect(parser, CHAR_1)
-
-  skipWhitespaceAndComments(parser)
-  const width = expectNumber(parser)
-  skipWhitespaceAndComments(parser)
-  const height = expectNumber(parser)
-  skipWhitespaceAndComments(parser)
-
-  const componentsPerPixel = 4
-  const pixels = new Uint8ClampedArray(width * height * componentsPerPixel)
-
-  const mapColor = (colorComponent: number) => colorComponent * 255
-
-  for (let i = 0; i < width * height; ++i) {
-    const bit = expectNumber(parser)
-    skipWhitespaceAndComments(parser)
-
-    const color = mapColor(bit)
-    pixels[i * componentsPerPixel + 0] = color
-    pixels[i * componentsPerPixel + 1] = color
-    pixels[i * componentsPerPixel + 2] = color
-    pixels[i * componentsPerPixel + 3] = 255
-  }
-
-  return { pixels, width, height, format: 'PBM P1' }
-}
-
-function parseP4(buffer: Uint8Array): Image {
-  const parser: Parser = { buffer: buffer, idx: 0 }
-  expect(parser, CHAR_P)
-  expect(parser, CHAR_4)
-
-  skipWhitespaceAndComments(parser)
-  const width = expectNumber(parser)
-  skipWhitespaceAndComments(parser)
-  const height = expectNumber(parser)
-  expectOne(parser, isWhitespace)
-
-  const componentsPerPixel = 4
-  const pixels = new Uint8ClampedArray(width * height * componentsPerPixel)
-
-  const mapColor = (colorComponent: number) => colorComponent * 255
-
-  const row =  new Uint8ClampedArray(Math.ceil(width / 8))
-  for (let y = 0; y < height; ++y) {
-    // Read row
-    for (let i = 0; i < row.length; ++i) {
-      row[i] = next(parser)
-    }
-
-    for (let x = 0; x < width; ++x) {
-      const byteIndex = Math.floor(x / 8)
-      const bitIndex = x % 8
-      const bit = (row[byteIndex] >> (7 - bitIndex)) & 1
-      const color = mapColor(bit)
-
-      pixels[y * width * componentsPerPixel + x * componentsPerPixel + 0] = color
-      pixels[y * width * componentsPerPixel + x * componentsPerPixel + 1] = color
-      pixels[y * width * componentsPerPixel + x * componentsPerPixel + 2] = color
-      pixels[y * width * componentsPerPixel + x * componentsPerPixel + 3] = 255
-    }
-  }
-
-  return { pixels, width, height, format: 'PBM P4' }
-}
-
-function parseP5(buffer: Uint8Array): Image {
-  const parser: Parser = { buffer: buffer, idx: 0 }
-  expect(parser, CHAR_P)
-  expect(parser, CHAR_5)
-
-  skipWhitespaceAndComments(parser)
-  const width = expectNumber(parser)
-  skipWhitespaceAndComments(parser)
-  const height = expectNumber(parser)
-  skipWhitespaceAndComments(parser)
-  const maxGrayValue = expectNumber(parser)
-  expectOne(parser, isWhitespace)
-
-  if (maxGrayValue <= 0 || maxGrayValue >= 65536) {
-    throw new Error(ERROR_MAX_COLOR_VALUE_OUT_OF_RANGE)
-  }
-
-  const componentsPerPixel = 4
-  const pixels = new Uint8ClampedArray(width * height * componentsPerPixel)
-
-  const mapColor = (colorComponent: number) => Math.floor((colorComponent / maxGrayValue) * 255)
-
-  const nextColorComponent =
-    (maxGrayValue < 256)
-    ? (parser: Parser): number => mapColor(next(parser))
-    : (parser: Parser): number => mapColor((next(parser) << 8) | next(parser))
-
-  for (let i = 0; i < width * height; ++i) {
-    const color = nextColorComponent(parser)
-    pixels[i * componentsPerPixel + 0] = color
-    pixels[i * componentsPerPixel + 1] = color
-    pixels[i * componentsPerPixel + 2] = color
-    pixels[i * componentsPerPixel + 3] = 255
-  }
-
-  // @TODO: Gamma?
-
-  return { pixels, width, height, format: 'PGM P5' }
-}
-
-function parseP2(buffer: Uint8Array): Image {
-  const parser: Parser = { buffer: buffer, idx: 0 }
-  expect(parser, CHAR_P)
-  expect(parser, CHAR_2)
-
-  skipWhitespaceAndComments(parser)
-  const width = expectNumber(parser)
-  skipWhitespaceAndComments(parser)
-  const height = expectNumber(parser)
-  skipWhitespaceAndComments(parser)
-  const maxGrayValue = expectNumber(parser)
-  expectOne(parser, isWhitespace)
-
-  if (maxGrayValue <= 0 || maxGrayValue >= 65536) {
-    throw new Error(ERROR_MAX_COLOR_VALUE_OUT_OF_RANGE)
-  }
-
-  const componentsPerPixel = 4
-  const pixels = new Uint8ClampedArray(width * height * componentsPerPixel)
-
-  const mapColor = (colorComponent: number) => Math.floor((colorComponent / maxGrayValue) * 255)
-
-  for (let i = 0; i < width * height; ++i) {
-    const color = mapColor(expectNumber(parser))
-    skipWhitespaceAndComments(parser)
-    pixels[i * componentsPerPixel + 0] = color
-    pixels[i * componentsPerPixel + 1] = color
-    pixels[i * componentsPerPixel + 2] = color
-    pixels[i * componentsPerPixel + 3] = 255
-  }
-
-  // @TODO: Gamma?
-
-  return { pixels, width, height, format: 'PGM P2' }
-}
-
-function parsePPM(buffer: Uint8Array): Image {
+const parsePPM = (buffer: Uint8Array): Image => {
   if (buffer[0] !== CHAR_P) {
     throw new Error(ERROR_UNKNOWN_MAGIC_NUMBER)
   }
