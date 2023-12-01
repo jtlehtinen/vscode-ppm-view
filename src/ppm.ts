@@ -167,7 +167,7 @@ function parseP6(buffer: Uint8Array): Image {
   const pixels = new Uint8ClampedArray(width * height * componentsPerPixel)
 
   // mapColor maps the color component from [0, maxColorValue] to [0, 255].
-  const mapColor = (colorComponent: number) => (colorComponent / maxColorValue) * 255
+  const mapColor = (colorComponent: number) => Math.floor((colorComponent / maxColorValue) * 255)
 
   const nextColorComponent =
     (maxColorValue < 256)
@@ -253,23 +253,94 @@ function parseP4(buffer: Uint8Array): Image {
   return { pixels, width, height, format: 'PBM P4' }
 }
 
-function parsePPM(buffer: Uint8Array): Image {
-  // PPM magic number is of the form 'PX', where
-  // X is a digit.
+function parseP5(buffer: Uint8Array): Image {
+  const parser: Parser = { buffer: buffer, idx: 0 }
+  expect(parser, CHAR_P)
+  expect(parser, CHAR_5)
 
+  skipWhitespaceAndComments(parser)
+  const width = expectNumber(parser)
+  skipWhitespaceAndComments(parser)
+  const height = expectNumber(parser)
+  skipWhitespaceAndComments(parser)
+  const maxGrayValue = expectNumber(parser)
+  expectOne(parser, isWhitespace)
+
+  if (maxGrayValue <= 0 || maxGrayValue >= 65536) {
+    throw new Error(ERROR_MAX_COLOR_VALUE_OUT_OF_RANGE)
+  }
+
+  const componentsPerPixel = 4
+  const pixels = new Uint8ClampedArray(width * height * componentsPerPixel)
+
+  const mapColor = (colorComponent: number) => Math.floor((colorComponent / maxGrayValue) * 255)
+
+  const nextColorComponent =
+    (maxGrayValue < 256)
+    ? (parser: Parser): number => mapColor(next(parser))
+    : (parser: Parser): number => mapColor((next(parser) << 8) | next(parser))
+
+  for (let i = 0; i < width * height; ++i) {
+    const color = nextColorComponent(parser)
+    pixels[i * componentsPerPixel + 0] = color
+    pixels[i * componentsPerPixel + 1] = color
+    pixels[i * componentsPerPixel + 2] = color
+    pixels[i * componentsPerPixel + 3] = 255
+  }
+
+  // @TODO: Gamma?
+
+  return { pixels, width, height, format: 'PGM P5' }
+}
+
+function parseP2(buffer: Uint8Array): Image {
+  const parser: Parser = { buffer: buffer, idx: 0 }
+  expect(parser, CHAR_P)
+  expect(parser, CHAR_2)
+
+  skipWhitespaceAndComments(parser)
+  const width = expectNumber(parser)
+  skipWhitespaceAndComments(parser)
+  const height = expectNumber(parser)
+  skipWhitespaceAndComments(parser)
+  const maxGrayValue = expectNumber(parser)
+  expectOne(parser, isWhitespace)
+
+  if (maxGrayValue <= 0 || maxGrayValue >= 65536) {
+    throw new Error(ERROR_MAX_COLOR_VALUE_OUT_OF_RANGE)
+  }
+
+  const componentsPerPixel = 4
+  const pixels = new Uint8ClampedArray(width * height * componentsPerPixel)
+
+  const mapColor = (colorComponent: number) => Math.floor((colorComponent / maxGrayValue) * 255)
+
+  for (let i = 0; i < width * height; ++i) {
+    const color = mapColor(expectNumber(parser))
+    skipWhitespaceAndComments(parser)
+    pixels[i * componentsPerPixel + 0] = color
+    pixels[i * componentsPerPixel + 1] = color
+    pixels[i * componentsPerPixel + 2] = color
+    pixels[i * componentsPerPixel + 3] = 255
+  }
+
+  // @TODO: Gamma?
+
+  return { pixels, width, height, format: 'PGM P2' }
+}
+
+function parsePPM(buffer: Uint8Array): Image {
   if (buffer[0] !== CHAR_P) {
     throw new Error(ERROR_UNKNOWN_MAGIC_NUMBER)
   }
 
   switch (buffer[1]) {
-    case CHAR_1:
-      return parseP1(buffer)
-    case CHAR_3:
-      return parseP3(buffer)
-    case CHAR_4:
-      return parseP4(buffer)
-    case CHAR_6:
-      return parseP6(buffer)
+    case CHAR_1: return parseP1(buffer)
+    case CHAR_2: return parseP2(buffer)
+    case CHAR_3: return parseP3(buffer)
+    case CHAR_4: return parseP4(buffer)
+    case CHAR_5: return parseP5(buffer)
+    case CHAR_6: return parseP6(buffer)
     default:
       throw new Error(ERROR_UNKNOWN_MAGIC_NUMBER)
   }

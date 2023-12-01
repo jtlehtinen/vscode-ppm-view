@@ -124,6 +124,28 @@ describe('PBM P4 parser', () => {
   // @TODO: Test with comments
 })
 
+describe('PGM P2 parser', () => {
+  const encoder = new TextEncoder()
+
+  it('succeeds when valid data', () => {
+    const buffer = new Uint8Array([
+      ...encoder.encode('P2 2 2 15 0 3 7 15'),
+    ])
+    const result = parsePPM(buffer)
+
+    expect(result.width).toBe(2)
+    expect(result.height).toBe(2)
+    expect(result.pixels).toStrictEqual(
+      new Uint8ClampedArray([
+        0, 0, 0, 255,
+        51, 51, 51, 255,
+        119, 119, 119, 255,
+        255, 255, 255, 255,
+      ]),
+    )
+  })
+  // @TODO: Test with comments
+})
 
 describe('PPM P6 parser', () => {
   const encoder = new TextEncoder()
