@@ -63,7 +63,7 @@ class PPMProvider implements vscode.CustomReadonlyEditorProvider<PPMDocument> {
     return await PPMDocument.create(uri)
   }
 
-  async resolveCustomEditor(document: PPMDocument, webviewPanel: vscode.WebviewPanel, _token: vscode.CancellationToken) {
+  async resolveCustomEditor(document: PPMDocument, webviewPanel: vscode.WebviewPanel, _token: vscode.CancellationToken): Promise<void> {
     webviewPanel.webview.options = { enableScripts: true, }
     webviewPanel.webview.html = generateHTML()
     this.webviews.add(document.uri, webviewPanel)
@@ -75,6 +75,14 @@ export function activate(context: vscode.ExtensionContext) {
   const options = { supportsMultipleEditorsPerDocument: false, }
   const disposable = vscode.window.registerCustomEditorProvider('vscode-ppm-view.ppm-view', provider, options)
   context.subscriptions.push(disposable)
+
+  const onPPMModified = (uri: vscode.Uri): void => {
+    vscode.window.showInformationMessage(`modified: ${uri.toString()}`)
+  }
+
+  const watcher = vscode.workspace.createFileSystemWatcher('**/*.ppm')
+  watcher.onDidChange(onPPMModified)
+  context.subscriptions.push(watcher)
 }
 
 export function deactivate() { }
