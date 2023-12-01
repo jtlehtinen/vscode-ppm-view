@@ -1,0 +1,56 @@
+{
+  "name": "vscode-ppm-view",
+  "displayName": "vscode-ppm-view",
+  "description": "PPM view for vscode",
+  "version": "0.0.1",
+  "private": true,
+  "packageManager": "pnpm@8.8.0",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jtlehtinen/vscode-ppm-view"
+  },
+  "engines": {
+    "vscode": "^1.69.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "main": "./dist/index.js",
+  "contributes": {
+    "customEditors": [
+      {
+        "viewType": "vscode-ppm-view.ppm-view",
+        "displayName": "PPM View",
+        "selector": [
+          {
+            "filenamePattern": "*.ppm"
+          }
+        ],
+        "priority": "default"
+      }
+    ]
+  },
+  "scripts": {
+    "build": "tsup src/index.ts --external vscode",
+    "dev": "npm run build --watch",
+    "vscode:prepublish": "npm run build",
+    "publish": "vsce publish --no-dependencies",
+    "pack": "vsce package --no-dependencies",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "release": "bumpp && nr publish"
+  },
+  "devDependencies": {
+    "@antfu/ni": "^0.21.12",
+    "@types/node": "^18.19.0",
+    "@types/vscode": "^1.84.2",
+    "@vscode/vsce": "^2.22.0",
+    "bumpp": "^9.2.0",
+    "tsup": "^8.0.1",
+    "typescript": "^5.3.2",
+    "vite": "^5.0.4",
+    "vitest": "^0.34.6"
+  }
+}
