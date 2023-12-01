@@ -27,6 +27,12 @@ const createWebviewContent = (title: string, uris: { script: vscode.Uri }) => {
         display: flex;
         justify-content: center;
         align-items: center;
+        flex-direction: column;
+        font-family: consolas;
+      }
+
+      p {
+        font-weight: bold;
       }
     </style>
   </head>
