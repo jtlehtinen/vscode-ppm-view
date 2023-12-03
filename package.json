@@ -1,9 +1,11 @@
 {
   "name": "vscode-ppm-view",
   "displayName": "PPM View",
-  "description": "PBM/PGM/PPM view for VSCode supporting PPM P3 and P6 formats",
-  "version": "0.0.1",
+  "description": "PBM/PGM/PPM/MAP view for VSCode",
+  "icon": "assets/logo.png",
+  "version": "0.0.2",
   "private": true,
+  "publisher": "jtlehtinen",
   "packageManager": "pnpm@8.8.0",
   "license": "MIT",
   "repository": {
@@ -11,12 +13,13 @@
     "url": "https://github.com/jtlehtinen/vscode-ppm-view"
   },
   "engines": {
-    "vscode": "^1.69.0"
+    "vscode": "^1.84.0"
   },
   "categories": [
     "Other"
   ],
   "main": "./dist/index.js",
+  "activationEvents": [],
   "contributes": {
     "customEditors": [
       {
