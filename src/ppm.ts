@@ -17,11 +17,12 @@ const CHAR_9 = 0x39
 const CHAR_P = 0x50
 
 // @TODO: Some of the formats support multiple images in a single file.
-const ERROR_MAX_COLOR_VALUE_OUT_OF_RANGE = 'max color value is out of allowed range [0, 65536)'
+const ERROR_MAX_COLOR_VALUE_OUT_OF_RANGE = 'max color value is out of allowed range (0, 65535]'
 const ERROR_UNKNOWN_MAGIC_NUMBER = 'unknown file type identifying magic number'
 const ERROR_INVALID_PPM = 'invalid ppm'
 const ERROR_UNEXPECTED_HEADER_PAM = 'unexpected header token in PAM file'
 const ERROR_UNSUPPORTED_TUPLE_TYPE = 'unsupported tuple type'
+const ERROR_IMAGE_TOO_LARGE = 'image is too large'
 
 interface Image {
   pixels: Uint8ClampedArray
@@ -33,6 +34,12 @@ interface Image {
 interface Parser {
   buffer: Uint8Array
   idx: number
+}
+
+const validateDimensions = (width: number, height: number): void => {
+  if (width > 16384 || height > 16384) {
+    throw new Error(ERROR_IMAGE_TOO_LARGE)
+  }
 }
 
 const clamp = (x: number, min: number, max: number): number => Math.min(Math.max(x, min), max)
@@ -103,6 +110,8 @@ const expectNumber = (parser: Parser): number => {
   return result
 }
 
+// parseP1 parses a PBM P1 image from the given buffer.
+// See https://netpbm.sourceforge.net/doc/pbm.html
 const parseP1 = (buffer: Uint8Array): Image => {
   const parser: Parser = { buffer: buffer, idx: 0 }
   expect(parser, CHAR_P)
@@ -112,22 +121,26 @@ const parseP1 = (buffer: Uint8Array): Image => {
   const width = expectNumber(parser)
   skipWhitespaceAndComments(parser)
   const height = expectNumber(parser)
-  skipWhitespaceAndComments(parser) // @NOTE: strict => single whitespace
+  validateDimensions(width, height)
+  skipWhitespaceAndComments(parser)
 
   const componentsPerPixel = 4
   const pixels = new Uint8ClampedArray(width * height * componentsPerPixel)
 
+  let outIdx = 0
   for (let i = 0; i < width * height; ++i) {
     const color = clamp(255 * expectNumber(parser), 0, 255)
     skipWhitespaceAndComments(parser)
-    pixels[i * componentsPerPixel + 0] = color
-    pixels[i * componentsPerPixel + 1] = color
-    pixels[i * componentsPerPixel + 2] = color
-    pixels[i * componentsPerPixel + 3] = 255
+    pixels[outIdx++] = color
+    pixels[outIdx++] = color
+    pixels[outIdx++] = color
+    pixels[outIdx++] = 255
   }
   return { pixels, width, height, format: 'PBM P1' }
 }
 
+// parseP2 parses a PGM P2 image from the given buffer.
+// https://netpbm.sourceforge.net/doc/pgm.html
 const parseP2 = (buffer: Uint8Array): Image => {
   const parser: Parser = { buffer: buffer, idx: 0 }
   expect(parser, CHAR_P)
@@ -137,28 +150,33 @@ const parseP2 = (buffer: Uint8Array): Image => {
   const width = expectNumber(parser)
   skipWhitespaceAndComments(parser)
   const height = expectNumber(parser)
+  validateDimensions(width, height)
   skipWhitespaceAndComments(parser)
-  const maxGrayValue = expectNumber(parser)
-  expectOne(parser, isWhitespace)
 
+  const maxGrayValue = expectNumber(parser)
   if (maxGrayValue <= 0 || maxGrayValue >= 65536) {
     throw new Error(ERROR_MAX_COLOR_VALUE_OUT_OF_RANGE)
   }
 
+  expectOne(parser, isWhitespace)
+
   const componentsPerPixel = 4
   const pixels = new Uint8ClampedArray(width * height * componentsPerPixel)
 
+  let outIdx = 0
   for (let i = 0; i < width * height; ++i) {
     const color = clamp(Math.floor((expectNumber(parser) / maxGrayValue) * 255), 0, 255)
     skipWhitespaceAndComments(parser)
-    pixels[i * componentsPerPixel + 0] = color
-    pixels[i * componentsPerPixel + 1] = color
-    pixels[i * componentsPerPixel + 2] = color
-    pixels[i * componentsPerPixel + 3] = 255
+    pixels[outIdx++] = color
+    pixels[outIdx++] = color
+    pixels[outIdx++] = color
+    pixels[outIdx++] = 255
   }
   return { pixels, width, height, format: 'PGM P2' }
 }
 
+// parseP3 parses a PPM P3 image from the given buffer.
+// See https://netpbm.sourceforge.net/doc/ppm.html
 const parseP3 = (buffer: Uint8Array): Image => {
   const parser: Parser = { buffer: buffer, idx: 0 }
   expect(parser, CHAR_P)
@@ -168,36 +186,40 @@ const parseP3 = (buffer: Uint8Array): Image => {
   const width = expectNumber(parser)
   skipWhitespaceAndComments(parser)
   const height = expectNumber(parser)
-  skipWhitespaceAndComments(parser)
-  const maxColorValue = expectNumber(parser)
+  validateDimensions(width, height)
   skipWhitespaceAndComments(parser)
 
-  if (maxColorValue < 0 || maxColorValue >= 65536) {
+  const maxColorValue = expectNumber(parser)
+  if (maxColorValue <= 0 || maxColorValue >= 65536) {
     throw new Error(ERROR_MAX_COLOR_VALUE_OUT_OF_RANGE)
   }
+
+  skipWhitespaceAndComments(parser)
 
   const componentsPerPixel = 4
   const pixels = new Uint8ClampedArray(width * height * componentsPerPixel)
 
-  const mapColor = (c: number) =>
-    clamp(Math.floor((c / maxColorValue) * 255), 0, 255)
+  const readColor = (parser: Parser): number => {
+    const color = expectNumber(parser)
+    skipWhitespaceAndComments(parser)
+    return clamp(Math.floor((color / maxColorValue) * 255), 0, 255)
+  }
 
+  let outIdx = 0
   for (let i = 0; i < width * height; ++i) {
-    const r = mapColor(expectNumber(parser))
-    skipWhitespaceAndComments(parser)
-    const g = mapColor(expectNumber(parser))
-    skipWhitespaceAndComments(parser)
-    const b = mapColor(expectNumber(parser))
-    skipWhitespaceAndComments(parser)
-
-    pixels[i * componentsPerPixel + 0] = r
-    pixels[i * componentsPerPixel + 1] = g
-    pixels[i * componentsPerPixel + 2] = b
-    pixels[i * componentsPerPixel + 3] = 255
+    const r = readColor(parser)
+    const g = readColor(parser)
+    const b = readColor(parser)
+    pixels[outIdx++] = r
+    pixels[outIdx++] = g
+    pixels[outIdx++] = b
+    pixels[outIdx++] = 255
   }
   return { pixels, width, height, format: 'PPM P3' }
 }
 
+// parseP4 parses a PBM P4 image from the given buffer.
+// See https://netpbm.sourceforge.net/doc/pbm.html
 const parseP4 = (buffer: Uint8Array): Image => {
   const parser: Parser = { buffer: buffer, idx: 0 }
   expect(parser, CHAR_P)
@@ -207,16 +229,16 @@ const parseP4 = (buffer: Uint8Array): Image => {
   const width = expectNumber(parser)
   skipWhitespaceAndComments(parser)
   const height = expectNumber(parser)
+  validateDimensions(width, height)
   expectOne(parser, isWhitespace)
 
   const componentsPerPixel = 4
   const pixels = new Uint8ClampedArray(width * height * componentsPerPixel)
-
-  const mapColor = (colorComponent: number) =>
-    clamp(colorComponent * 255, 0, 255)
-
   const row =  new Uint8ClampedArray(Math.ceil(width / 8))
+
+  let outIdx = 0
   for (let y = 0; y < height; ++y) {
+    // @NOTE: Read a whole row from the buffer.
     for (let i = 0; i < row.length; ++i) {
       row[i] = next(parser)
     }
@@ -225,17 +247,19 @@ const parseP4 = (buffer: Uint8Array): Image => {
       const byteIndex = Math.floor(x / 8)
       const bitIndex = x % 8
       const bit = (row[byteIndex] >> (7 - bitIndex)) & 1
-      const color = mapColor(bit)
+      const color = clamp(bit * 255, 0, 255)
 
-      pixels[y * width * componentsPerPixel + x * componentsPerPixel + 0] = color
-      pixels[y * width * componentsPerPixel + x * componentsPerPixel + 1] = color
-      pixels[y * width * componentsPerPixel + x * componentsPerPixel + 2] = color
-      pixels[y * width * componentsPerPixel + x * componentsPerPixel + 3] = 255
+      pixels[outIdx++] = color
+      pixels[outIdx++] = color
+      pixels[outIdx++] = color
+      pixels[outIdx++] = 255
     }
   }
   return { pixels, width, height, format: 'PBM P4' }
 }
 
+// parseP5 parses a PGM P5 image from the given buffer.
+// See https://netpbm.sourceforge.net/doc/pgm.html
 const parseP5 = (buffer: Uint8Array): Image => {
   const parser: Parser = { buffer: buffer, idx: 0 }
   expect(parser, CHAR_P)
@@ -245,31 +269,34 @@ const parseP5 = (buffer: Uint8Array): Image => {
   const width = expectNumber(parser)
   skipWhitespaceAndComments(parser)
   const height = expectNumber(parser)
+  validateDimensions(width, height)
   skipWhitespaceAndComments(parser)
-  const maxGrayValue = expectNumber(parser)
-  expectOne(parser, isWhitespace)
 
+  const maxGrayValue = expectNumber(parser)
   if (maxGrayValue <= 0 || maxGrayValue >= 65536) {
     throw new Error(ERROR_MAX_COLOR_VALUE_OUT_OF_RANGE)
   }
 
+  expectOne(parser, isWhitespace)
+
   const componentsPerPixel = 4
   const pixels = new Uint8ClampedArray(width * height * componentsPerPixel)
 
-  const mapColor = (colorComponent: number) =>
-    clamp(Math.floor((colorComponent / maxGrayValue) * 255), 0, 255)
+  const mapColor = (c: number) =>
+    clamp(Math.floor((c / maxGrayValue) * 255), 0, 255)
 
-  const nextColorComponent =
+  const readColor =
     (maxGrayValue < 256)
     ? (parser: Parser): number => mapColor(next(parser))
     : (parser: Parser): number => mapColor((next(parser) << 8) | next(parser))
 
+  let outIdx = 0
   for (let i = 0; i < width * height; ++i) {
-    const color = nextColorComponent(parser)
-    pixels[i * componentsPerPixel + 0] = color
-    pixels[i * componentsPerPixel + 1] = color
-    pixels[i * componentsPerPixel + 2] = color
-    pixels[i * componentsPerPixel + 3] = 255
+    const color = readColor(parser)
+    pixels[outIdx++] = color
+    pixels[outIdx++] = color
+    pixels[outIdx++] = color
+    pixels[outIdx++] = 255
   }
   return { pixels, width, height, format: 'PGM P5' }
 }
@@ -283,46 +310,43 @@ const parseP6 = (buffer: Uint8Array): Image => {
   const width = expectNumber(parser)
   skipWhitespaceAndComments(parser)
   const height = expectNumber(parser)
+  validateDimensions(width, height)
   skipWhitespaceAndComments(parser)
-  const maxColorValue = expectNumber(parser)
-  expectOne(parser, isWhitespace)
 
+  const maxColorValue = expectNumber(parser)
   if (maxColorValue < 0 || maxColorValue >= 65536) {
     throw new Error(ERROR_MAX_COLOR_VALUE_OUT_OF_RANGE)
   }
 
+  expectOne(parser, isWhitespace)
+
   const componentsPerPixel = 4
   const pixels = new Uint8ClampedArray(width * height * componentsPerPixel)
 
-  // mapColor maps the color component from [0, maxColorValue] to [0, 255].
-  const mapColor = (colorComponent: number) => Math.floor((colorComponent / maxColorValue) * 255)
+  const mapColor = (c: number) =>
+    Math.floor((c / maxColorValue) * 255)
 
-  const nextColorComponent =
+  const readColor =
     (maxColorValue < 256)
     ? (parser: Parser): number => mapColor(next(parser))
     : (parser: Parser): number => mapColor((next(parser) << 8) | next(parser))
 
+  let outIdx = 0
   for (let i = 0; i < width * height; ++i) {
-    pixels[i * componentsPerPixel + 0] = nextColorComponent(parser)
-    pixels[i * componentsPerPixel + 1] = nextColorComponent(parser)
-    pixels[i * componentsPerPixel + 2] = nextColorComponent(parser)
-    pixels[i * componentsPerPixel + 3] = 255
+    pixels[outIdx++] = readColor(parser)
+    pixels[outIdx++] = readColor(parser)
+    pixels[outIdx++] = readColor(parser)
+    pixels[outIdx++] = 255
   }
-
   return { pixels, width, height, format: 'PPM P6' }
 }
 
+// parseP7 parses a PAM P7 image from the given buffer.
+// See https://netpbm.sourceforge.net/doc/pam.html
 const parseP7 = (buffer: Uint8Array): Image => {
   const parser: Parser = { buffer: buffer, idx: 0 }
   expect(parser, CHAR_P)
   expect(parser, CHAR_7)
-
-  let width = 0
-  let height = 0
-  let depth = 0
-  let maxVal = 0
-  let tupleTypeTemp = []
-  let token = ''
 
   const readHeaderToken = (parser: Parser): string => {
     let token = ''
@@ -340,6 +364,13 @@ const parseP7 = (buffer: Uint8Array): Image => {
     return tupleType.trim()
   }
 
+  let width = 0
+  let height = 0
+  let depth = 0
+  let maxValue = 0
+  let tupleType = ''
+  let token = ''
+
   skipWhitespaceAndComments(parser)
   while ((token = readHeaderToken(parser)) !== 'ENDHDR') {
     skipWhitespaceAndComments(parser)
@@ -354,10 +385,10 @@ const parseP7 = (buffer: Uint8Array): Image => {
         depth = expectNumber(parser)
         break
       case 'MAXVAL':
-        maxVal = expectNumber(parser)
+        maxValue = expectNumber(parser)
         break
       case 'TUPLTYPE':
-        tupleTypeTemp.push(readTupleType(parser))
+        tupleType = readTupleType(parser)
         break
       default:
         throw new Error(ERROR_UNEXPECTED_HEADER_PAM)
@@ -366,68 +397,62 @@ const parseP7 = (buffer: Uint8Array): Image => {
   }
   skipWhitespaceAndComments(parser)
 
-  const tupleType = tupleTypeTemp.join(' ')
-
-  if (maxVal <= 0 || maxVal >= 65536) {
+  if (maxValue <= 0 || maxValue >= 65536) {
     throw new Error(ERROR_MAX_COLOR_VALUE_OUT_OF_RANGE)
   }
-
-  // @TODO: validate???
-  // BLACKANDWHITE MAXVAL=1; DEPTH=1
-  // BLACKANDWHITE_ALPHA MAXVAL=1; DEPTH=2
-  // GRAYSCALE MAXVAL=65535; DEPTH=1
-  // GRAYSCALE_ALPHA MAXVAL=65535; DEPTH=2
-  // RGB MAXVAL=65535; DEPTH=3
-  // RGB_ALPHA MAXVAL=65535; DEPTH=4
 
   const componentsPerPixel = 4
   const pixels = new Uint8ClampedArray(width * height * componentsPerPixel)
 
   const mapColor = (colorComponent: number) =>
-    clamp(Math.floor((colorComponent / maxVal) * 255), 0, 255)
+    clamp(Math.floor((colorComponent / maxValue) * 255), 0, 255)
 
-  const nextColorComponent =
-    (maxVal < 256)
+  const readColor =
+    (maxValue < 256)
     ? (parser: Parser): number => mapColor(next(parser))
     : (parser: Parser): number => mapColor((next(parser) << 8) | next(parser))
 
   if (tupleType === 'BLACKANDWHITE' || tupleType === 'GRAYSCALE') {
+    let outIdx = 0
     for (let i = 0; i < width * height; ++i) {
-      const color = nextColorComponent(parser)
-      pixels[i * componentsPerPixel + 0] = color
-      pixels[i * componentsPerPixel + 1] = color
-      pixels[i * componentsPerPixel + 2] = color
-      pixels[i * componentsPerPixel + 3] = 255
+      const color = readColor(parser)
+      pixels[outIdx++] = color
+      pixels[outIdx++] = color
+      pixels[outIdx++] = color
+      pixels[outIdx++] = 255
     }
   } else if (tupleType === 'BLACKANDWHITE_ALPHA' || tupleType === 'GRAYSCALE_ALPHA') {
+    let outIdx = 0
     for (let i = 0; i < width * height; ++i) {
-      const color = nextColorComponent(parser)
-      const alpha = nextColorComponent(parser)
-      pixels[i * componentsPerPixel + 0] = color
-      pixels[i * componentsPerPixel + 1] = color
-      pixels[i * componentsPerPixel + 2] = color
-      pixels[i * componentsPerPixel + 3] = alpha
+      const color = readColor(parser)
+      const alpha = readColor(parser)
+      pixels[outIdx++] = color
+      pixels[outIdx++] = color
+      pixels[outIdx++] = color
+      pixels[outIdx++] = alpha
     }
   } else if (tupleType === 'RGB') {
+    let outIdx = 0
     for (let i = 0; i < width * height; ++i) {
-      const r = nextColorComponent(parser)
-      const g = nextColorComponent(parser)
-      const b = nextColorComponent(parser)
-      pixels[i * componentsPerPixel + 0] = r
-      pixels[i * componentsPerPixel + 1] = g
-      pixels[i * componentsPerPixel + 2] = b
-      pixels[i * componentsPerPixel + 3] = 255
+      const r = readColor(parser)
+      const g = readColor(parser)
+      const b = readColor(parser)
+      pixels[outIdx++] = r
+      pixels[outIdx++] = g
+      pixels[outIdx++] = b
+      pixels[outIdx++] = 255
     }
   } else if (tupleType === 'RGB_ALPHA') {
+    let outIdx = 0
     for (let i = 0; i < width * height; ++i) {
-      const r = nextColorComponent(parser)
-      const g = nextColorComponent(parser)
-      const b = nextColorComponent(parser)
-      const a = nextColorComponent(parser)
-      pixels[i * componentsPerPixel + 0] = r
-      pixels[i * componentsPerPixel + 1] = g
-      pixels[i * componentsPerPixel + 2] = b
-      pixels[i * componentsPerPixel + 3] = a
+      const r = readColor(parser)
+      const g = readColor(parser)
+      const b = readColor(parser)
+      const a = readColor(parser)
+      pixels[outIdx++] = r
+      pixels[outIdx++] = g
+      pixels[outIdx++] = b
+      pixels[outIdx++] = a
     }
   } else {
     throw new Error(ERROR_UNSUPPORTED_TUPLE_TYPE)
