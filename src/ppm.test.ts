@@ -191,3 +191,145 @@ describe('PPM P6 parser', () => {
     expect(() => parsePPM(buffer)).toThrowError()
   })
 })
+
+describe('PAM P7 parser', () => {
+  const encoder = new TextEncoder()
+
+  it('succeeds when valid data RGB', () => {
+    const buffer = new Uint8Array([
+      ...encoder.encode(`P7\nWIDTH 2\nHEIGHT 2\nDEPTH 3\nMAXVAL 255\nTUPLTYPE RGB\nENDHDR\n`),
+      ...[
+          0, 0, 0,
+          255, 0, 0,
+          0, 255, 0,
+          0, 0, 255,
+        ],
+    ])
+    const result = parsePPM(buffer)
+
+    expect(result.width).toBe(2)
+    expect(result.height).toBe(2)
+    expect(result.pixels).toStrictEqual(
+      new Uint8ClampedArray([
+        0, 0, 0, 255,
+        255, 0, 0, 255,
+        0, 255, 0, 255,
+        0, 0, 255, 255
+      ]),
+    )
+  })
+
+  it('succeeds when valid data RGB_ALPHA', () => {
+    const buffer = new Uint8Array([
+      ...encoder.encode(`P7\nWIDTH 2\nHEIGHT 2\nDEPTH 4\nMAXVAL 255\nTUPLTYPE RGB_ALPHA\nENDHDR\n`),
+      ...[
+          0, 0, 0, 255,
+          255, 0, 0, 255,
+          0, 255, 0, 255,
+          0, 0, 255, 255
+        ],
+    ])
+    const result = parsePPM(buffer)
+
+    expect(result.width).toBe(2)
+    expect(result.height).toBe(2)
+    expect(result.pixels).toStrictEqual(
+      new Uint8ClampedArray([
+        0, 0, 0, 255,
+        255, 0, 0, 255,
+        0, 255, 0, 255,
+        0, 0, 255, 255
+      ]),
+    )
+  })
+
+  it('succeeds when valid data GRAYSCALE', () => {
+    const buffer = new Uint8Array([
+      ...encoder.encode(`P7\nWIDTH 2\nHEIGHT 2\nDEPTH 1\nMAXVAL 255\nTUPLTYPE GRAYSCALE\nENDHDR\n`),
+      ...[
+          0, 75, 150, 255
+        ],
+    ])
+    const result = parsePPM(buffer)
+
+    expect(result.width).toBe(2)
+    expect(result.height).toBe(2)
+    expect(result.pixels).toStrictEqual(
+      new Uint8ClampedArray([
+        0, 0, 0, 255,
+        75, 75, 75, 255,
+        150, 150, 150, 255,
+        255, 255, 255, 255,
+      ]),
+    )
+  })
+
+  it('succeeds when valid data GRAYSCALE_ALPHA', () => {
+    const buffer = new Uint8Array([
+      ...encoder.encode(`P7\nWIDTH 2\nHEIGHT 2\nDEPTH 2\nMAXVAL 255\nTUPLTYPE GRAYSCALE_ALPHA\nENDHDR\n`),
+      ...[
+          0, 0,
+          75, 255,
+          150, 150,
+          255, 255,
+        ],
+    ])
+    const result = parsePPM(buffer)
+
+    expect(result.width).toBe(2)
+    expect(result.height).toBe(2)
+    expect(result.pixels).toStrictEqual(
+      new Uint8ClampedArray([
+        0, 0, 0, 0,
+        75, 75, 75, 255,
+        150, 150, 150, 150,
+        255, 255, 255, 255,
+      ]),
+    )
+  })
+
+  it('succeeds when valid data BLACKANDWHITE', () => {
+    const buffer = new Uint8Array([
+      ...encoder.encode(`P7\nWIDTH 2\nHEIGHT 2\nDEPTH 1\nMAXVAL 1\nTUPLTYPE BLACKANDWHITE\nENDHDR\n`),
+      ...[
+          0, 0, 1, 1,
+        ],
+    ])
+    const result = parsePPM(buffer)
+
+    expect(result.width).toBe(2)
+    expect(result.height).toBe(2)
+    expect(result.pixels).toStrictEqual(
+      new Uint8ClampedArray([
+        0, 0, 0, 255,
+        0, 0, 0, 255,
+        255, 255, 255, 255,
+        255, 255, 255, 255,
+      ]),
+    )
+  })
+
+  it('succeeds when valid data BLACKANDWHITE_ALPHA', () => {
+    const buffer = new Uint8Array([
+      ...encoder.encode(`P7\nWIDTH 2\nHEIGHT 2\nDEPTH 2\nMAXVAL 1\nTUPLTYPE BLACKANDWHITE_ALPHA\nENDHDR\n`),
+      ...[
+          0, 0,
+          0, 1,
+          1, 0,
+          1, 1,
+        ],
+    ])
+    const result = parsePPM(buffer)
+
+    expect(result.width).toBe(2)
+    expect(result.height).toBe(2)
+    expect(result.pixels).toStrictEqual(
+      new Uint8ClampedArray([
+        0, 0, 0, 0,
+        0, 0, 0, 255,
+        255, 255, 255, 0,
+        255, 255, 255, 255,
+      ]),
+    )
+  })
+})

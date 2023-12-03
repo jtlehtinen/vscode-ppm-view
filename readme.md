@@ -1,6 +1,8 @@
 # vscode-ppm-view
 
-Simple [PPM](https://netpbm.sourceforge.net/doc/ppm.html), [PBM](https://netpbm.sourceforge.net/doc/pbm.html) viewer extension for Visual Studio Code.
+Simple [PPM](https://netpbm.sourceforge.net/doc/ppm.html), [PBM](https://netpbm.sourceforge.net/doc/pbm.html), and [PAM](https://netpbm.sourceforge.net/doc/pam.html) viewer extension for Visual Studio Code.
+
+For the PAM format this extension supports the following `TUPLTYPE` values `BLACKANDWHITE`, `BLACKANDWHITE_ALPHA`, `GRAYSCALE`, `GRAYSCALE_ALPHA`, `RGB`, and `RGB_ALPHA`.
 
 ## Interaction Guide
 

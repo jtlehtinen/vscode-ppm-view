@@ -1,7 +1,3 @@
-// [ppm](https://netpbm.sourceforge.net/doc/ppm.html)
-// [pbm](https://netpbm.sourceforge.net/doc/pbm.html)
-// [ppm/pgm/pbm image files](http://paulbourke.net/dataformats/ppm/)
-
 const CHAR_SPACE = 0x20
 const CHAR_NEWLINE = 0xa
 const CHAR_CARRIAGE_RETURN = 0xd
@@ -16,12 +12,16 @@ const CHAR_3 = 0x33
 const CHAR_4 = 0x34
 const CHAR_5 = 0x35
 const CHAR_6 = 0x36
+const CHAR_7 = 0x37
 const CHAR_9 = 0x39
 const CHAR_P = 0x50
 
+// @TODO: Some of the formats support multiple images in a single file.
 const ERROR_MAX_COLOR_VALUE_OUT_OF_RANGE = 'max color value is out of allowed range [0, 65536)'
 const ERROR_UNKNOWN_MAGIC_NUMBER = 'unknown file type identifying magic number'
 const ERROR_INVALID_PPM = 'invalid ppm'
+const ERROR_UNEXPECTED_HEADER_PAM = 'unexpected header token in PAM file'
+const ERROR_UNSUPPORTED_TUPLE_TYPE = 'unsupported tuple type'
 
 interface Image {
   pixels: Uint8ClampedArray
@@ -309,7 +309,131 @@ const parseP6 = (buffer: Uint8Array): Image => {
     pixels[i * componentsPerPixel + 3] = 255
   }
 
-  return { pixels, width, height, format: 'PPM P3' }
+  return { pixels, width, height, format: 'PPM P6' }
+}
+
+const parseP7 = (buffer: Uint8Array): Image => {
+  const parser: Parser = { buffer: buffer, idx: 0 }
+  expect(parser, CHAR_P)
+  expect(parser, CHAR_7)
+
+  let width = 0
+  let height = 0
+  let depth = 0
+  let maxVal = 0
+  let tupleTypeTemp = []
+  let token = ''
+
+  const readHeaderToken = (parser: Parser): string => {
+    let token = ''
+    while (!isAtEnd(parser) && !isWhitespace(peek(parser))) {
+      token += String.fromCharCode(next(parser))
+    }
+    return token
+  }
+
+  const readTupleType = (parser: Parser): string => {
+    let tupleType = ''
+    while (!isAtEnd(parser) && peek(parser) !== CHAR_NEWLINE) {
+      tupleType += String.fromCharCode(next(parser))
+    }
+    return tupleType.trim()
+  }
+
+  skipWhitespaceAndComments(parser)
+  while ((token = readHeaderToken(parser)) !== 'ENDHDR') {
+    skipWhitespaceAndComments(parser)
+    switch (token) {
+      case 'WIDTH':
+        width = expectNumber(parser)
+        break
+      case 'HEIGHT':
+        height = expectNumber(parser)
+        break
+      case 'DEPTH':
+        depth = expectNumber(parser)
+        break
+      case 'MAXVAL':
+        maxVal = expectNumber(parser)
+        break
+      case 'TUPLTYPE':
+        tupleTypeTemp.push(readTupleType(parser))
+        break
+      default:
+        throw new Error(ERROR_UNEXPECTED_HEADER_PAM)
+    }
+    skipWhitespaceAndComments(parser)
+  }
+  skipWhitespaceAndComments(parser)
+
+  const tupleType = tupleTypeTemp.join(' ')
+
+  if (maxVal <= 0 || maxVal >= 65536) {
+    throw new Error(ERROR_MAX_COLOR_VALUE_OUT_OF_RANGE)
+  }
+
+  // @TODO: validate???
+  // BLACKANDWHITE MAXVAL=1; DEPTH=1
+  // BLACKANDWHITE_ALPHA MAXVAL=1; DEPTH=2
+  // GRAYSCALE MAXVAL=65535; DEPTH=1
+  // GRAYSCALE_ALPHA MAXVAL=65535; DEPTH=2
+  // RGB MAXVAL=65535; DEPTH=3
+  // RGB_ALPHA MAXVAL=65535; DEPTH=4
+
+  const componentsPerPixel = 4
+  const pixels = new Uint8ClampedArray(width * height * componentsPerPixel)
+
+  const mapColor = (colorComponent: number) =>
+    clamp(Math.floor((colorComponent / maxVal) * 255), 0, 255)
+
+  const nextColorComponent =
+    (maxVal < 256)
+    ? (parser: Parser): number => mapColor(next(parser))
+    : (parser: Parser): number => mapColor((next(parser) << 8) | next(parser))
+
+  if (tupleType === 'BLACKANDWHITE' || tupleType === 'GRAYSCALE') {
+    for (let i = 0; i < width * height; ++i) {
+      const color = nextColorComponent(parser)
+      pixels[i * componentsPerPixel + 0] = color
+      pixels[i * componentsPerPixel + 1] = color
+      pixels[i * componentsPerPixel + 2] = color
+      pixels[i * componentsPerPixel + 3] = 255
+    }
+  } else if (tupleType === 'BLACKANDWHITE_ALPHA' || tupleType === 'GRAYSCALE_ALPHA') {
+    for (let i = 0; i < width * height; ++i) {
+      const color = nextColorComponent(parser)
+      const alpha = nextColorComponent(parser)
+      pixels[i * componentsPerPixel + 0] = color
+      pixels[i * componentsPerPixel + 1] = color
+      pixels[i * componentsPerPixel + 2] = color
+      pixels[i * componentsPerPixel + 3] = alpha
+    }
+  } else if (tupleType === 'RGB') {
+    for (let i = 0; i < width * height; ++i) {
+      const r = nextColorComponent(parser)
+      const g = nextColorComponent(parser)
+      const b = nextColorComponent(parser)
+      pixels[i * componentsPerPixel + 0] = r
+      pixels[i * componentsPerPixel + 1] = g
+      pixels[i * componentsPerPixel + 2] = b
+      pixels[i * componentsPerPixel + 3] = 255
+    }
+  } else if (tupleType === 'RGB_ALPHA') {
+    for (let i = 0; i < width * height; ++i) {
+      const r = nextColorComponent(parser)
+      const g = nextColorComponent(parser)
+      const b = nextColorComponent(parser)
+      const a = nextColorComponent(parser)
+      pixels[i * componentsPerPixel + 0] = r
+      pixels[i * componentsPerPixel + 1] = g
+      pixels[i * componentsPerPixel + 2] = b
+      pixels[i * componentsPerPixel + 3] = a
+    }
+  } else {
+    throw new Error(ERROR_UNSUPPORTED_TUPLE_TYPE)
+  }
+
+  return { pixels, width, height, format: 'PAM P7' }
 }
 
 const parsePPM = (buffer: Uint8Array): Image => {
@@ -324,6 +448,7 @@ const parsePPM = (buffer: Uint8Array): Image => {
     case CHAR_4: return parseP4(buffer)
     case CHAR_5: return parseP5(buffer)
     case CHAR_6: return parseP6(buffer)
+    case CHAR_7: return parseP7(buffer)
     default:
       throw new Error(ERROR_UNKNOWN_MAGIC_NUMBER)
   }

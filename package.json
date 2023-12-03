@@ -31,6 +31,12 @@
           },
           {
             "filenamePattern": "*.pbm"
+          },
+          {
+            "filenamePattern": "*.pam"
+          },
+          {
+            "filenamePattern": "*.pnm"
           }
         ],
         "priority": "default"
