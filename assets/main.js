@@ -1,10 +1,12 @@
+const SCALE_FACTOR = 1.1
+const MIN_SCALE_TICKS = -10
+const MAX_SCALE_TICKS = 50
+const HEADER_HEIGHT = 60
+
 const error = document.getElementById('error')
 const canvas = document.getElementById('canvas')
 const info = document.getElementById('info')
 const context = canvas.getContext('2d')
-
-const MIN_SCALE_TICKS = -10
-const MAX_SCALE_TICKS = 50
 
 let bitmap = null
 let zoomTicks = 0
@@ -16,16 +18,43 @@ const clamp = (value, min, max) => {
   return value
 }
 
+// fitSizeToWindow returns the largest zoom ticks value that fits the
+// image to the window.
+const fitSizeToWindow = (width, height) => {
+  const windowWidth = window.innerWidth
+  const windowHeight = window.innerHeight
+
+  let zoomTicks = MIN_SCALE_TICKS
+
+  while (true) {
+    const scale = Math.pow(SCALE_FACTOR, zoomTicks)
+    const newWidth = width * scale
+    const newHeight = height * scale
+
+    if (newWidth > windowWidth || newHeight > windowHeight - HEADER_HEIGHT) {
+      zoomTicks--
+      break
+    }
+
+    zoomTicks++
+  }
+
+  return clamp(zoomTicks, MIN_SCALE_TICKS, MAX_SCALE_TICKS)
+}
+
 const showImage = async (bitmap, zoomTicks) => {
   if (!bitmap) return
 
-  const scale = Math.pow(1.1, zoomTicks)
+  const scale = Math.pow(SCALE_FACTOR, zoomTicks)
   const scaledWidth = Math.ceil(bitmap.width * scale)
   const scaledHeight = Math.ceil(bitmap.height * scale)
 
+  const windowWidth = window.innerWidth
+  const windowHeight = window.innerHeight
+
   canvas.style.display = 'block'
-  canvas.width = scaledWidth
-  canvas.height = scaledHeight
+  canvas.width = Math.min(scaledWidth, windowWidth)
+  canvas.height = Math.min(scaledHeight, windowHeight)
 
   context.imageSmoothingQuality = 'high'
   context.drawImage(bitmap, 0, 0, scaledWidth, scaledHeight)
@@ -53,7 +82,8 @@ const zoom = (ticks) => {
 }
 
 const resetZoom = () => {
-  zoomTicks = 0
+  if (!bitmap) return
+  zoomTicks = fitSizeToWindow(bitmap.width, bitmap.height)
   showImage(bitmap, zoomTicks)
 }
 
@@ -63,6 +93,7 @@ window.addEventListener('message', async (event) => {
     const imageData = new ImageData(pixels, width, height)
     bitmap = await window.createImageBitmap(imageData)
     imageFormat = format
+    zoomTicks = fitSizeToWindow(width, height)
 
     hideError()
     showImage(bitmap, zoomTicks)
