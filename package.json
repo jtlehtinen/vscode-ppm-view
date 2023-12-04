@@ -3,7 +3,7 @@
   "displayName": "PPM View",
   "description": "PBM/PGM/PPM/MAP view for VSCode",
   "icon": "assets/logo.png",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "private": true,
   "publisher": "jtlehtinen",
   "packageManager": "pnpm@8.8.0",
