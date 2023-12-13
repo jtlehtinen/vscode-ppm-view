@@ -58,7 +58,6 @@
     "release": "bumpp && nr publish"
   },
   "devDependencies": {
-    "@antfu/ni": "^0.21.12",
     "@types/node": "^18.19.3",
     "@types/vscode": "^1.85.0",
     "@vscode/vsce": "^2.22.0",
